@@ -1878,7 +1878,7 @@ f5:function f5(a){this.a=a}},K={
 iL:function(a,b){H.k(b,"$iaX")
 return $.R().aM(0,a,b)}},N={
 iT:function(){var u=new X.f4(new X.dN(H.L([],[X.cB])))
-u.sbL(H.L(["https://github.com/sh1l0n/mypwa.github.io/","https://github.com/sh1l0n/mypwa.github.io/index.html","https://github.com/sh1l0n/mypwa.github.io/ble.js","https://github.com/sh1l0n/mypwa.github.io/main.dart.js"],[P.i]))
+u.sbL(H.L(["https://sh1l0n.github.io/mypwa.github.io/","https://sh1l0n.github.io/mypwa.github.io/index.html","https://sh1l0n.github.io/mypwa.github.io/ble.js","https://sh1l0n.github.io/mypwa.github.io/main.dart.js"],[P.i]))
 P.iV("Running PWA, version: v0.0.1")
 X.k5(u)}}
 var w=[C,H,J,P,W,X,V,S,Q,O,L,K,N]
