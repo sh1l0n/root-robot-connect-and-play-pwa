@@ -1,3 +1,4 @@
+// Copyright © 2019 Root Robotics, Inc. (http://www.codewithroot.com/) All rights reserved.
 {}(function dartProgram(){function copyProperties(a,b){var u=Object.keys(a)
 for(var t=0;t<u.length;t++){var s=u[t]
 b[s]=a[s]}}var z=function(){var u=function(){}
@@ -1878,7 +1879,7 @@ f5:function f5(a){this.a=a}},K={
 iL:function(a,b){H.k(b,"$iaX")
 return $.R().aM(0,a,b)}},N={
 iT:function(){var u=new X.f4(new X.dN(H.L([],[X.cB])))
-u.sbL(H.L(["https://sh1l0n.github.io/mypwa.github.io/","https://sh1l0n.github.io/mypwa.github.io/index.html","https://sh1l0n.github.io/mypwa.github.io/ble.js","https://sh1l0n.github.io/mypwa.github.io/main.dart.js","https://sh1l0n.github.io/mypwa.github.io/manifest.json","https://sh1l0n.github.io/mypwa.github.io/assets/icons-192.png","https://sh1l0n.github.io/mypwa.github.io/assets/icons-512.png"],[P.i]))
+u.sbL(H.L(["https://localhost:8080/","https://localhost:8080/index.html","https://localhost:8080/ble.js","https://localhost:8080/main.dart.js","https://localhost:8080/common/common.dart.js","https://localhost:8080/scratch-blocks/blockly_compressed_horizontal.js","https://localhost:8080/scratch-blocks/blocks_compressed_horizontal.js","https://localhost:8080/scratch-blocks/en.js","https://localhost:8080/scratch-blocks/scratchBlocks.jshttps://localhost:8080/scratch-blocks/media/icons/arrow.svg","https://localhost:8080/scratch-blocks/media/icons/bumperBothBlock.png","https://localhost:8080/scratch-blocks/media/icons/control_forever.svg","https://localhost:8080/scratch-blocks/media/icons/control_repeat.svg","https://localhost:8080/scratch-blocks/media/icons/control_stop.svg","https://localhost:8080/scratch-blocks/media/icons/control_wait.svg","https://localhost:8080/scratch-blocks/media/icons/event_broadcast_blue.svg","https://localhost:8080/scratch-blocks/media/icons/event_when-broadcast-received_blue.svg","https://localhost:8080/scratch-blocks/media/icons/event_whenflagclicked.svg","https://localhost:8080/scratch-blocks/media/dropdown-arrow.svg","https://localhost:8080/scratch-blocks/media/rotate-right.svg","https://localhost:8080/scratch-blocks/media/sprites.png","https://localhost:8080/scratch-blocks/media/zoom-in.svg","https://localhost:8080/scratch-blocks/media/zoom-out.svg","https://localhost:8080/scratch-blocks/media/zoom-reset.svg"],[P.i]))
 P.iV("Running PWA, version: v0.0.1")
 X.k5(u)}}
 var w=[C,H,J,P,W,X,V,S,Q,O,L,K,N]
@@ -4012,7 +4013,7 @@ k=r
 o=H.aj(k)
 n=H.aO(k)
 p.b.b.length
-P.iV("Precache of 7 offline URLs failed: "+H.j(o)+"\n"+H.j(n))
+P.iV("Precache of 23 offline URLs failed: "+H.j(o)+"\n"+H.j(n))
 u=7
 break
 case 4:u=1
