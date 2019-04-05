@@ -31,6 +31,13 @@ class StatementSVMSemantics extends StatementSemantics {
         if(nextBlock!=null) {
             environment.semantics[nextBlock.type].run(nextBlock, environment);
         }
+        else {
+            var nextContainer = this.getNextOfContainer(statment, environment);
+            if(nextContainer!=null) {
+                environment.semantics[nextContainer.type].run(nextContainer, environment);
+            }
+
+        }
         //statement.view?.hideRunningMark()
     };
 
@@ -51,10 +58,10 @@ class StatementSVMSemantics extends StatementSemantics {
     getNextOfContainer(statment, environment) {
         var parent = statment.getParent();
         if(parent!=null) {
-            return environment.semantics[parent.type].getNextOfContainer(parent);
+            return environment.semantics[parent.type].getNextOfContainer(parent, environment);
         }
         return null;
-    }
+    };
 }
 
 class StatementSVMRootV1Semantics extends StatementSemantics {
@@ -66,7 +73,7 @@ class EventSVMSemantics extends StatementSVMRootV1Semantics {
         super();     
         this.event = null;
         this.statment = statment;
-    }
+    };
     
     stop(statment, environment) {
         super.stop()
@@ -131,9 +138,15 @@ class RootV1MoveSVMSemantics extends StatementSVMRootV1Semantics {
 
         var completion = () => {};
         let nextBlock = statment.getNextBlock();
+        let nextContainer = this.getNextOfContainer(statment, environment);
         if(nextBlock!=null) {
             completion = () => {
                 environment.semantics[nextBlock.type].run(nextBlock, environment);
+            }
+        }
+        else if(nextContainer!=null) {
+            completion = () => {
+                environment.semantics[nextContainer.type].run(nextContainer, environment);
             }
         }
         environment.robot.move(cm, completion);
@@ -148,11 +161,18 @@ class RootV1RotateSVMSemantics extends StatementSVMRootV1Semantics {
 
         var completion = () => {};
         let nextBlock = statment.getNextBlock();
+        let nextContainer = this.getNextOfContainer(statment, environment);
         if(nextBlock!=null) {
             completion = () => {
                 environment.semantics[nextBlock.type].run(nextBlock, environment);
             }
         }
+        else if(nextContainer!=null) {
+            completion = () => {
+                environment.semantics[nextContainer.type].run(nextContainer, environment);
+            }
+        }
+
         environment.robot.rotate(degs, completion);
     };
 }
@@ -163,13 +183,20 @@ class ControlWaitSVMSemantics extends StatementSVMRootV1Semantics {
 
         let seconds = statment.getInputTargetBlock('DURATION').getFieldValue('NUM');
 
-        var completion = () => {};
+                var completion = () => {};
         let nextBlock = statment.getNextBlock();
+        let nextContainer = this.getNextOfContainer(statment, environment);
         if(nextBlock!=null) {
             completion = () => {
                 environment.semantics[nextBlock.type].run(nextBlock, environment);
             }
         }
+        else if(nextContainer!=null) {
+            completion = () => {
+                environment.semantics[nextContainer.type].run(nextContainer, environment);
+            }
+        }
+
         environment.robot.wait(seconds, completion);
     };
 }
@@ -180,13 +207,12 @@ class ControlRepeatSVMSemantics extends StatementSVMRootV1Semantics {
         super();
         this.iterations = 0;
         this.maxIterations = 0;
-
-    }
+    };
     
     resetIterations() {
         this.iterations = 0
         this.maxIterations = 0
-    }
+    };
 
     run(statment, environment) {
 
@@ -201,14 +227,17 @@ class ControlRepeatSVMSemantics extends StatementSVMRootV1Semantics {
             if(firstOnSubstack!=null) {
                 environment.semantics[firstOnSubstack.type].run(firstOnSubstack, environment);
             }
-
-            super.run(statment, environment);
             return;
         }
 
+        this.resetIterations();
         let nextBlock = statment.getNextBlock();
+        let nextContainer = this.getNextOfContainer(statment, environment);
         if(nextBlock!=null) {
             environment.semantics[nextBlock.type].run(nextBlock, environment);
+        }
+        else if(nextContainer!=null) {
+            environment.semantics[nextContainer.type].run(nextContainer, environment);
         }
     };
 
@@ -218,7 +247,7 @@ class ControlRepeatSVMSemantics extends StatementSVMRootV1Semantics {
         this.resetIterations();
     };
 
-    getNextOfContainer(statment) {
+    getNextOfContainer(statment, environment) {
         this.resetIterations()
 
         if(this.iterations<this.maxIterations) {
@@ -233,7 +262,7 @@ class ControlRepeatSVMSemantics extends StatementSVMRootV1Semantics {
         else {
             return super.getNextOfContainer();
         }
-    }
+    };
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -539,7 +568,7 @@ class Environment {
         this.workspace = null;
         this.vm = new SquareVM();
         this.robot = new Root(this.vm);
-        this.blocks = {};
+        this.eventBlocks = {};
 
         this.semantics = {
             // Events
@@ -551,7 +580,6 @@ class Environment {
             'rotate': new RootV1RotateSVMSemantics(),
         
             // Flow Control
-            'control_forever': new StatementSVMSemantics(),
             'control_repeat': new ControlRepeatSVMSemantics(),
             'control_wait': new ControlWaitSVMSemantics()
         }
@@ -566,30 +594,29 @@ class Environment {
             case Blockly.Events.CREATE: 
                 switch(block.type) {
                     case 'event_whenflagclicked':
-                        environment.blocks[event.blockId] = new RootV1WhenProgramStartsSVMSemantics(block);
-                        environment.blocks[event.blockId].didInsert(block, environment);
+                        environment.eventBlocks[event.blockId] = new RootV1WhenProgramStartsSVMSemantics(block);
+                        environment.eventBlocks[event.blockId].didInsert(block, environment);
                     break;
                     case 'event_whenBumpersPressed':
-                        environment.blocks[event.blockId] = new WhenRootV1BumpersChangeSVMSemantics(block);
-                        environment.blocks[event.blockId].didInsert(block, environment);
+                        environment.eventBlocks[event.blockId] = new WhenRootV1BumpersChangeSVMSemantics(block);
+                        environment.eventBlocks[event.blockId].didInsert(block, environment);
                     break;
                 }
                 
                 break;
 
             case Blockly.Events.DELETE: 
-                switch(block.type) {
-                    case 'event_whenBumpersPressed':
-                        environment.blocks[event.blockId].didDetach(block, environment);
-                    break;
+                var deletedBlock = environment.eventBlocks[event.blockId];
+                if(deletedBlock!=null) {
+                    environment.eventBlocks[event.blockId].didDetach(deletedBlock, environment);
+                    delete environment.eventBlocks[event.blockId];
                 }
-                delete environment.blocks[event.blockId];
                 break;
 
             case Blockly.Events.CHANGE: 
                 switch(block.type) {
                     case 'dropdown_bumpers':
-                        environment.blocks[block.parentBlock_.id].didModify(block, environment, true);
+                        environment.eventBlocks[block.parentBlock_.id].didModify(block, environment, true);
                     break;
                 }
                 break;
@@ -667,9 +694,9 @@ class Root {
     }
 
     bumpersTest(event) {
-        const leftBumper = (event.data[0] == event.condition[0]);
-        const rightBumper = (event.data[1] == event.condition[1]);
-        return leftBumper && rightBumper;
+        const leftBumper = ((event.data[0] ? 1 : 0) & (event.condition[0] ? 1 : 0) == 1)
+        const rightBumper = ((event.data[1] ? 1 : 0) & (event.condition[1] ? 1 : 0) == 1)
+        return leftBumper || rightBumper;
     }
 
     whenBumpers(states, task) {

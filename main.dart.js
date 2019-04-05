@@ -1,4 +1,3 @@
-// Copyright © 2019 Root Robotics, Inc. (http://www.codewithroot.com/) All rights reserved.
 {}(function dartProgram(){function copyProperties(a,b){var u=Object.keys(a)
 for(var t=0;t<u.length;t++){var s=u[t]
 b[s]=a[s]}}var z=function(){var u=function(){}
