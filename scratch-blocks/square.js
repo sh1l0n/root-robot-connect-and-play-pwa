@@ -58,13 +58,18 @@ class StatementSVMSemantics extends StatementSemantics {
     getNextOfContainer(statment, environment) {
         var parent = statment.getParent();
         if(parent!=null) {
-            return environment.semantics[parent.type].getNextOfContainer(parent, environment);
+            if(parent.category_ =='control') {
+                return parent;
+            }
+            else {
+                return environment.semantics[parent.type].getNextOfContainer(parent, environment);
+            }
         }
         return null;
     };
 }
 
-class StatementSVMRootV1Semantics extends StatementSemantics {
+class StatementSVMRootV1Semantics extends StatementSVMSemantics {
 }
 
 class EventSVMSemantics extends StatementSVMRootV1Semantics {
@@ -232,7 +237,7 @@ class ControlRepeatSVMSemantics extends StatementSVMRootV1Semantics {
 
         this.resetIterations();
         let nextBlock = statment.getNextBlock();
-        let nextContainer = this.getNextOfContainer(statment, environment);
+        let nextContainer = super.getNextOfContainer(statment, environment);
         if(nextBlock!=null) {
             environment.semantics[nextBlock.type].run(nextBlock, environment);
         }
@@ -245,23 +250,6 @@ class ControlRepeatSVMSemantics extends StatementSVMRootV1Semantics {
         super.stop()
         //self?.statement?.view?.hideRunningMark()
         this.resetIterations();
-    };
-
-    getNextOfContainer(statment, environment) {
-        this.resetIterations()
-
-        if(this.iterations<this.maxIterations) {
-            return statment;
-        }
-        resetIterations();
-
-        // If next is nil, this may still be a nested block, so it needs to go back recursively gi
-        if(statment.getNextBlock()!=null) {
-            return statment.getNextBlock();
-        }
-        else {
-            return super.getNextOfContainer();
-        }
     };
 }
 
@@ -580,7 +568,7 @@ class Environment {
             'rotate': new RootV1RotateSVMSemantics(),
         
             // Flow Control
-            'control_repeat': new ControlRepeatSVMSemantics(),
+            'control_repeat': new StatementSVMSemantics(),//ControlRepeatSVMSemantics(),
             'control_wait': new ControlWaitSVMSemantics()
         }
     };
