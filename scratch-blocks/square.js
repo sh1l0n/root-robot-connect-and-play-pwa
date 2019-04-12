@@ -484,8 +484,8 @@ class Environment {
             case 'rotate': return Blockly.Colours.RootCodingCommands.primary;
         
             // Flow Control
-            case 'control_repeat': return Blockly.Colours.control.primary;
-            case 'control_wait': return Blockly.Colours.control.primary;
+            case 'control_repeat': return Blockly.Colours.RootCodingControl.primary;
+            case 'control_wait': return Blockly.Colours.RootCodingControl.primary;
             default: return block.getColour();
         }
     };
