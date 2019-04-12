@@ -8,33 +8,40 @@
 
 // This file contains all the behaviours for each block of the coding space.
 class BlockSemantics {
-    didModify(statment, environment, calledFromEditor) {}
-    didInsert(statment, environment) {}
-    didDetach(statment, environment) {}
-    didRemove(statment, environment) {}
+    didModify(environment, calledFromEditor) {};
+    didInsert(environment) {};
+    didDetach(environment) {};
+    didRemove(environment) {};
 }
 
 class StatementSemantics extends BlockSemantics {
 
-    run(statment, environment) {};
-    stop(statment, environment) {};
+    run(environment) {};
+    stop(environment) {};
+    getNextOfContainer(environment) {};
 }
 
 class StatementSVMSemantics extends StatementSemantics {
 
+    constructor(statment) {
+        super();
+        this.statment = statment;
+    }
+
     // Must be overridden by the subclasses:
-    run(statment, environment) {
+    run(environment) {
+        environment.setCurrentBlock(statment);
         // The equivalent to "do nothing" in the run() method is to at least, return the reference to the next block.
         // Hack: the running mark is not managed by the VM in this case, but by the semantics.
         //statement.view?.showRunningMark()
-        let nextBlock = statment.getNextBlock();
+        let nextBlock = this.statment.getNextBlock();
         if(nextBlock!=null) {
-            environment.semantics[nextBlock.type].run(nextBlock, environment);
+            environment.blocks[nextBlock.id].run(environment);
         }
         else {
-            var nextContainer = this.getNextOfContainer(statment, environment);
+            var nextContainer = this.getNextOfContainer(environment);
             if(nextContainer!=null) {
-                environment.semantics[nextContainer.type].run(nextContainer, environment);
+                environment.blocks[nextContainer.id].run(environment);
             }
 
         }
@@ -42,30 +49,62 @@ class StatementSVMSemantics extends StatementSemantics {
     };
 
     /// If overridden by subclasses, be sure to call super.stop():
-    stop(statment, environment) {
-
-        var current  = statment;
-        while(true) {
-            var parent = current.getParent();
-            if(parent==null) {
-                return;
-            }
-            environment.semantics[parent.type].stop();
-            current = parent;
+    stop(environment) {
+        environment.setCurrentBlock(null);
+        var current  = this.statment;
+        var parent = environment.blocks[current.id].getNextOfContainer(environment);
+        if(parent!=null) {
+            environment.blocks[parent.id].stop(environment);
         }
     };
 
-    getNextOfContainer(statment, environment) {
-        var parent = statment.getParent();
+    getNextOfContainer(environment) {
+        var parent = this.statment.getParent();
+
         if(parent!=null) {
-            if(parent.category_ =='control') {
-                return parent;
+            // As ScratchBlock is defined. The previous connection of the blocks can coincide with its container, so we need to check
+            // when is container and when not.
+            var previousConnection = this.statment.previousConnection;
+            var lastConnection = previousConnection!=null ? previousConnection.targetConnection.sourceBlock_ : null;
+
+            if(lastConnection!=null && lastConnection.id==parent.id && parent.type=='control_repeat') {
+                let firstOnSubstack = parent.getInputTargetBlock('SUBSTACK');
+                if(firstOnSubstack!=null && firstOnSubstack.id==this.statment.id) {
+                    return parent;
+                }
+                return null;
             }
             else {
-                return environment.semantics[parent.type].getNextOfContainer(parent, environment);
+                return environment.blocks[parent.id].getNextOfContainer(environment);
             }
         }
         return null;
+    };
+
+    getNextAction(environment) {
+        var completion = () => {};
+        let nextBlock = this.statment.getNextBlock();
+        let nextContainer = this.getNextOfContainer(environment);
+        
+        if(nextBlock!=null) {
+            completion = () => {
+                environment.setCurrentBlock(null);
+                environment.blocks[nextBlock.id].run(environment);
+            }
+        }
+        else if(nextContainer!=null) {
+            completion = () => {
+                environment.setCurrentBlock(null);
+                environment.blocks[nextContainer.id].run(environment);
+            }
+        }
+        else {
+            completion = () => {
+                environment.setCurrentBlock(null);
+            }
+        }
+
+        return completion;
     };
 }
 
@@ -75,28 +114,28 @@ class StatementSVMRootV1Semantics extends StatementSVMSemantics {
 class EventSVMSemantics extends StatementSVMRootV1Semantics {
 
     constructor(statment) {   
-        super();     
+        super(statment);     
         this.event = null;
-        this.statment = statment;
     };
     
-    stop(statment, environment) {
+    stop(environment) {
         super.stop()
         //self?.statement?.view?.hideRunningMark()
     };
     
-    didDetach(statment, environment) {
+    didDetach(environment) {
         environment.vm.events.remove(this.event)
     };
 }
 
 class RootV1WhenProgramStartsSVMSemantics extends EventSVMSemantics {
     
-    didInsert(statment, environment) {  
+    didInsert(environment) {  
         this.event = environment.robot.whenProgramStarts( () => {
+            environment.setCurrentBlock(this.statment);
             let nextBlock = this.statment.getNextBlock();
             if(nextBlock!=null) {
-                environment.semantics[nextBlock.type].run(nextBlock, environment);
+                environment.blocks[nextBlock.id].run(environment);
             }
         });
     };
@@ -120,96 +159,58 @@ class WhenRootV1BumpersChangeSVMSemantics extends EventSVMSemantics {
         return [false, false];
     };
 
-    didInsert(statment, environment) {      
-        var value = statment.childBlocks_[0].inputList[0].fieldRow[0].value_;
+    didInsert(environment) {      
+        var value = this.statment.childBlocks_[0].inputList[0].fieldRow[0].value_;
         this.event = environment.robot.whenBumpers(this.parseFromParam(value), () => {
+
+            environment.setCurrentBlock(this.statment);
             let nextBlock = this.statment.getNextBlock();
             if(nextBlock!=null) {
-                environment.semantics[nextBlock.type].run(nextBlock, environment);
+                environment.blocks[nextBlock.id].run(environment);
             }
         });
     };
     
-    didModify(statment, environment, calledFromEditor) {        
-        var value = statment.inputList[0].fieldRow[0].value_;
+    didModify(environment, calledFromEditor) {        
+        var value = this.statment.inputList[0].fieldRow[0].value_;
         this.event.condition = this.parseFromParam(value)
     };
 }
 
 class RootV1MoveSVMSemantics extends StatementSVMRootV1Semantics {
 
-    run(statment, environment) {
-        let cm = statment.getInputTargetBlock('CM').getFieldValue('NUM');
-
-        var completion = () => {};
-        let nextBlock = statment.getNextBlock();
-        let nextContainer = this.getNextOfContainer(statment, environment);
-        if(nextBlock!=null) {
-            completion = () => {
-                environment.semantics[nextBlock.type].run(nextBlock, environment);
-            }
-        }
-        else if(nextContainer!=null) {
-            completion = () => {
-                environment.semantics[nextContainer.type].run(nextContainer, environment);
-            }
-        }
+    run(environment) {
+        environment.setCurrentBlock(this.statment);
+        let cm = this.statment.getInputTargetBlock('CM').getFieldValue('NUM');
+        const completion = this.getNextAction(environment);
         environment.robot.move(cm, completion);
     };
 }
 
 class RootV1RotateSVMSemantics extends StatementSVMRootV1Semantics {
 
-    run(statment, environment) {
-
-        let degs = statment.getInputTargetBlock('DEGS').getFieldValue('NUM');
-
-        var completion = () => {};
-        let nextBlock = statment.getNextBlock();
-        let nextContainer = this.getNextOfContainer(statment, environment);
-        if(nextBlock!=null) {
-            completion = () => {
-                environment.semantics[nextBlock.type].run(nextBlock, environment);
-            }
-        }
-        else if(nextContainer!=null) {
-            completion = () => {
-                environment.semantics[nextContainer.type].run(nextContainer, environment);
-            }
-        }
-
+    run(environment) {
+        environment.setCurrentBlock(this.statment);
+        let degs = this.statment.getInputTargetBlock('DEGS').getFieldValue('NUM');
+        const completion = this.getNextAction(environment);
         environment.robot.rotate(degs, completion);
     };
 }
 
 class ControlWaitSVMSemantics extends StatementSVMRootV1Semantics {
 
-    run(statment, environment) {
-
-        let seconds = statment.getInputTargetBlock('DURATION').getFieldValue('NUM');
-
-                var completion = () => {};
-        let nextBlock = statment.getNextBlock();
-        let nextContainer = this.getNextOfContainer(statment, environment);
-        if(nextBlock!=null) {
-            completion = () => {
-                environment.semantics[nextBlock.type].run(nextBlock, environment);
-            }
-        }
-        else if(nextContainer!=null) {
-            completion = () => {
-                environment.semantics[nextContainer.type].run(nextContainer, environment);
-            }
-        }
-
+    run(environment) {
+        environment.setCurrentBlock(this.statment);
+        let seconds = this.statment.getInputTargetBlock('DURATION').getFieldValue('NUM');
+        const completion = this.getNextAction(environment);
         environment.robot.wait(seconds, completion);
     };
 }
 
 class ControlRepeatSVMSemantics extends StatementSVMRootV1Semantics {
 
-    constructor() {
-        super();
+    constructor(statment) {
+        super(statment);
         this.iterations = 0;
         this.maxIterations = 0;
     };
@@ -219,37 +220,31 @@ class ControlRepeatSVMSemantics extends StatementSVMRootV1Semantics {
         this.maxIterations = 0
     };
 
-    run(statment, environment) {
+    run(environment) {
+
+        environment.setCurrentBlock(this.statment);
 
         if(this.maxIterations==0) {
-            this.maxIterations = parseInt(statment.getInputTargetBlock('TIMES').getFieldValue('NUM'));
+            this.maxIterations = parseInt(this.statment.getInputTargetBlock('TIMES').getFieldValue('NUM'));
         }
 
         if(this.iterations<this.maxIterations) {
             this.iterations+=1;
-
-            let firstOnSubstack = statment.getInputTargetBlock('SUBSTACK');
+            let firstOnSubstack = this.statment.getInputTargetBlock('SUBSTACK');
             if(firstOnSubstack!=null) {
-                environment.semantics[firstOnSubstack.type].run(firstOnSubstack, environment);
+                environment.blocks[firstOnSubstack.id].run(environment);
+                return;
             }
-            return;
         }
 
+        environment.setCurrentBlock(null);
         this.resetIterations();
-        let nextBlock = statment.getNextBlock();
-        let nextContainer = super.getNextOfContainer(statment, environment);
-        if(nextBlock!=null) {
-            environment.semantics[nextBlock.type].run(nextBlock, environment);
-        }
-        else if(nextContainer!=null) {
-            environment.semantics[nextContainer.type].run(nextContainer, environment);
-        }
+        getNextAction(environment)();
     };
 
-    stop(statment, environment) {
-        super.stop()
-        //self?.statement?.view?.hideRunningMark()
+    stop(environment) {
         this.resetIterations();
+        super.stop(environment)
     };
 }
 
@@ -415,7 +410,7 @@ class EventsManager {
         event.onStop();
     };
 
-    arbitrate(source, data) {
+    arbitrate(source, data, environment) {
         if(!this.isRunning) {
            return; 
         }
@@ -425,16 +420,15 @@ class EventsManager {
             // Will only evaluate the stored events that belongs to the incoming event's source:
             if(event.source == source) {
                 event.data = data;
-                // An event can not interrupt itself, unless its allowSelfInterruption flag is true:
-                if(event.allowSelfInterruption || event != this.currentEvent) {
-                    if(event.testFunction(event)) {
-                        return event;
-                        break
-                    }
+                if(event.testFunction(event)) {
+                    this.stop(this.currentEvent);
+                    environment.stopCurrentBlock();
+                    this.currentEvent = event;
+                    this.run(event);
+                    break;
                 }
             }
         }
-        return null;
     };
 }
 
@@ -447,101 +441,23 @@ class SquareVM {
     constructor() {
         this.events = new EventsManager();
         this.isRunning = false;
-        this.isPaused = false;
-        this.canStepForward = true;
-        this.lastRanBlock = null;
         this.didStop = function() {};
     }
 
     run() {
-
         if(this.isRunning){
             return
         }
-
         // Enables the events system, just in case it was disabled before:
         this.events.isRunning = true;
-        
-        var lastRanEvent = this.events.idleEvent();
-            
-        // The lastRanBlock must be reinitialized from run to run of the VM. Otherwise, its stop method will be called.
         this.isRunning = true;
-
-        runInifiniteLoopJS(8, 
-            ()=> { //runCondition
-                // Only runs the event if it is not already running (note that this does not prevent the current event to be changed by the EventsManager to a new, not-yet-running event):
-                return this.isRunning;
-            }, 
-            ()=>{ //runCode()
-                if(!this.events.currentEvent.isRunning) {
-
-                    // Only runs the event if it has changed since the last iteration (unless it has interrupted itself):
-                    if(lastRanEvent !== this.events.currentEvent || this.events.currentEvent.forceRun) {
-                        lastRanEvent = this.events.currentEvent;
-
-                        if(lastRanEvent != null) {
-                            // Setting this flag HERE is critical for the boomerangs to work properly:
-                            lastRanEvent.forceRun = false;
-                            this.events.run(lastRanEvent);
-                        }
-                        
-                        // Was the event interrupted by another incoming event since the call to this.events.run(event:)? If that happened, then this comparison will be false, and thus the lastRanEvent did not finish, which means that there is no need of pointing the currentEvent to the idle one:
-                        if(lastRanEvent == this.events.currentEvent && !lastRanEvent.forceRun) {
-                            this.events.setCurrentEventToIdle()
-                        }
-                    }
-                } 
-            }, 
-            ()=>{ //stopCode()
-            }
-        );
-    }
-
-    runBlock(statement) {
-        var next = statement;
-        
-        while(next!=null) {
-            if(this.isRunning && this.events.currentEvent != null && this.events.currentEvent.isRunning) {
-                return;
-            }
-            //showRunningMark(visible: true, forBlock: statement)
-            next = stepForward(statement);
-            // This is necessary to hide the last statement of an event. Otherwise, its running mark will persist when the system goes to idle:
-            //showRunningMark(visible: false, forBlock: lastBlockShowingRunningMark)
-        }
-    }
-
-    stepForward(statement) {
-        if(!this.isRunning) {
-            return null;
-        }
-
-        this.canStepForward = true;
-        var nextBlock = semantics[lastRanBlock.type].run(statement, null); //robot
-        this.lastRanBlock = statement
-
-        var nextContainer = environment.semantics[statement.type].getNextOfContainer();
-
-        if(nextBlock!=null) {
-            return nextBlock;
-        }
-        else if(nextContainer!=null){
-            return nextContainer;
-        }
-        else {
-            return null;
-        }
     }
 
     stop() {
-         
         this.isRunning = false;
-        
+        this.events.isRunning = false;
         this.events.stop(this.events.currentEvent);
-        //environment.semantics[lastRanBlock.type].stop();
-        this.lastRanBlock = null;
         this.events.setCurrentEventToIdle();
-        
         this.didStop();
     }
 }
@@ -556,62 +472,98 @@ class Environment {
         this.workspace = null;
         this.vm = new SquareVM();
         this.robot = new Root(this.vm);
-        this.eventBlocks = {};
+        this.blocks = {};
+        this._currentExecutingBlock = null;
+        this.runningMarkColour = 190;
+    };
 
-        this.semantics = {
+    getDefaultColour(type) {
+        
+        switch(type) {
             // Events
-            'event_whenflagclicked' : new RootV1WhenProgramStartsSVMSemantics(),
-            'event_whenBumpersPressed' : new WhenRootV1BumpersChangeSVMSemantics(),
+            case 'event_whenflagclicked' : return Blockly.Colours.RootCodingEvents.primary;
+            case 'event_whenBumpersPressed' : return Blockly.Colours.RootCodingEvents.primary;
         
             // Commands
-            'move': new RootV1MoveSVMSemantics(),
-            'rotate': new RootV1RotateSVMSemantics(),
+            case 'move': return Blockly.Colours.RootCodingCommands.primary;
+            case 'rotate': return Blockly.Colours.RootCodingCommands.primary;
         
             // Flow Control
-            'control_repeat': new StatementSVMSemantics(),//ControlRepeatSVMSemantics(),
-            'control_wait': new ControlWaitSVMSemantics()
+            case 'control_repeat': return Blockly.Colours.control.primary;
+            case 'control_wait': return Blockly.Colours.control.primary;
+            default: return block.getColour();
         }
     };
 
+    setCurrentBlock(block) {
+        if(this._currentExecutingBlock!=null) {
+            var colour = this.getDefaultColour(this._currentExecutingBlock.type);
+            this._currentExecutingBlock.setColour(colour);
+        }
+
+        this._currentExecutingBlock = block;
+
+        if(this._currentExecutingBlock!=null) {
+            this._currentExecutingBlock.setColour(this.runningMarkColour);
+        }
+    };
+
+    stopCurrentBlock() {
+        if(this._currentExecutingBlock!=null && this.blocks[this._currentExecutingBlock.id]!=null) {
+            this.blocks[this._currentExecutingBlock.id].stop(environment);
+            this.setCurrentBlock(null);
+        }
+    };
+
+    getSemantics(block) {
+
+        switch(block.type) {
+            // Events
+            case 'event_whenflagclicked' : return new RootV1WhenProgramStartsSVMSemantics(block);
+            case 'event_whenBumpersPressed' : return new WhenRootV1BumpersChangeSVMSemantics(block);
+        
+            // Commands
+            case 'move': return new RootV1MoveSVMSemantics(block);
+            case 'rotate': return new RootV1RotateSVMSemantics(block);
+        
+            // Flow Control
+            case 'control_repeat': return new ControlRepeatSVMSemantics(block);
+            case 'control_wait': return new ControlWaitSVMSemantics(block);
+            default: return null;
+        }
+    };
 
     onWorkspaceChangeListener(event) {
 
-        var block = environment.workspace.getBlockById(event.blockId);
+        var blockId = event.blockId;
+        var block = environment.workspace.getBlockById(blockId);
 
         switch(event.type) {
-            case Blockly.Events.CREATE: 
-                switch(block.type) {
-                    case 'event_whenflagclicked':
-                        environment.eventBlocks[event.blockId] = new RootV1WhenProgramStartsSVMSemantics(block);
-                        environment.eventBlocks[event.blockId].didInsert(block, environment);
-                    break;
-                    case 'event_whenBumpersPressed':
-                        environment.eventBlocks[event.blockId] = new WhenRootV1BumpersChangeSVMSemantics(block);
-                        environment.eventBlocks[event.blockId].didInsert(block, environment);
-                    break;
-                }
-                
+            case Blockly.Events.BLOCK_CREATE: 
+                environment.blocks[blockId] = environment.getSemantics(block);
+                environment.blocks[blockId].didInsert(environment);
                 break;
 
-            case Blockly.Events.DELETE: 
-                var deletedBlock = environment.eventBlocks[event.blockId];
+            case Blockly.Events.BLOCK_DELETE: 
+                var deletedBlock = environment.blocks[blockId];
                 if(deletedBlock!=null) {
-                    environment.eventBlocks[event.blockId].didDetach(deletedBlock, environment);
-                    delete environment.eventBlocks[event.blockId];
+                    environment.blocks[blockId].didDetach(environment);
+                    delete environment.blocks[blockId];
                 }
                 break;
 
-            case Blockly.Events.CHANGE: 
+            case Blockly.Events.BLOCK_CHANGE: 
                 switch(block.type) {
                     case 'dropdown_bumpers':
-                        environment.eventBlocks[block.parentBlock_.id].didModify(block, environment, true);
+                        environment.blocks[block.parentBlock_.id].didModify(environment, true);
+                    break;
+                    default: 
+                        environment.blocks[blockId].didModify(environment); 
                     break;
                 }
                 break;
         }
-
-        environment.vm.events.printEvents();
-    }
+    };
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -693,26 +645,26 @@ class Root {
 
     run() {        
         // ##TODO: enable events on the physical robot if necessary.
+        this.halt();
         this.eventRunner.run();
     }
     
     stop() {
-        this.eventRunner.stop();
         this.halt();
+        this.eventRunner.stop();
         sendCommand([0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     }
 
-    stopAll() {
-        this.eventRunner.stop()
-    }
-
     onEnter() {
-        // This is necessary in order to stop, at the beginning of each new event, potentially ongoing long commands (such as move, rotate, etc.). Note that the stopCurrentCommand function does not stop anything that is not already running (see the comments on its declaration). This means that this is an efficient way of stopping ongoing things. This is a critical call, since the whole new event's response will not start until everything is stopped in the robot, so the right place for doing it (from an EventsManager perspective) is here, at the beginning of the new event, given that the fast stop of the long commands loops has already been done, when this is called, on the onStop method of the previous current event. So once the EventsManager has switched to the new one, just before executing the task callback, the onEnter callback is called and this is the prefect place (not just theoretical, but also measured) in order to stop everything and still achieve fast event response times.
-        this.stopCurrentCommand();
+        // Duplicated code on this.halt(). The system does not recognize halt() function
+        this.acceptsCommands = true;
+        this.commandStack = [];
     }
 
     onStop() {
+        // Duplicated code on this.halt(). The system does not recognize halt() function
         this.acceptsCommands = true;
+        this.commandStack = [];
     }
     
     // MARK: Convenience methods to expose eventsRunner's own methods but with shorter syntax:
@@ -727,18 +679,6 @@ class Root {
         this.eventRunner.events.stopIfCurrentIsNotRunning();
     }
 
-    _stopAll() {        
-        this.stopAll()
-        // ##TODO: Stop the events system too and test that everything works as before.
-    }
-    
-    
-    /// NOTE: It's important to stop all the robot's subsystems here. So if in the future more components are added to this class, they must be stopped here.
-    stopCurrentCommand() {
-        // The system now can accept new commands:
-        this.acceptsCommands = true
-    }
-
     toByteArray(data) {
         var result = [0, 0, 0, 0];
         result[0] = parseInt((data >> 24) & 0xff);
@@ -751,7 +691,7 @@ class Root {
     incrementCommandId() {
         this.commandId += 1;
         if(this.commandId>255) {
-            resetCommandId();
+            this.resetCommandId();
         }
     }
 
@@ -783,12 +723,15 @@ class Root {
     }
 
     addToStack(code) {
+        code();
+        /*
         this.commandStack.push(code);
         this.executeNextCommand();
+        */
     }
     
     halt() {
-        this.acceptsCommands = true
+        this.acceptsCommands = true;
         this.commandStack = [];
         // ##EVAL: If the id returned will be processed in order to resend the command if not received, since the stopAll is a critical command which execution must be ensured.
         //this._stopAll()
@@ -798,7 +741,7 @@ class Root {
         
         var code = () => {
             this.isExecutingCommand = true;
-            this.acceptCommands = false;
+            this.acceptsCommands = false;
 
             let mm = Math.abs(cm*10) < Number.MAX_SAFE_INTEGER ? cm*10 : 0;
             let speed = 0; // mm/s
@@ -815,8 +758,8 @@ class Root {
             
             var stopCode = () => { 
                 this.isExecutingCommand = false;
-                if(!this.acceptCommands && completion!=null) {
-                    this.acceptCommands = true;
+                if(!this.acceptsCommands && completion!=null) {
+                    this.acceptsCommands = true;
                     completion();
                 }
             };
@@ -832,7 +775,7 @@ class Root {
 
         var code = () => {
             this.isExecutingCommand = true;
-            this.acceptCommands = false;
+            this.acceptsCommands = false;
 
             //let tenthOfDeg = abs(angle.degToTenthOfDeg) < CGFloat(Int32.max) ? Int32(angle.degToTenthOfDeg) : 0
             let tenthOfDeg = Math.abs(degs*10) < Number.MAX_SAFE_INTEGER ? degs*10 : 0;
@@ -850,8 +793,8 @@ class Root {
 
             var stopCode = () => { 
                 this.isExecutingCommand = false;
-                if(!this.acceptCommands && completion!=null) {
-                    this.acceptCommands = true;
+                if(!this.acceptsCommands && completion!=null) {
+                    this.acceptsCommands = true;
                     completion();
                 }
             };
@@ -866,12 +809,12 @@ class Root {
     wait(seconds, completion) {
         var code = () => {
             this.isExecutingCommand = true;
-            this.acceptCommands = false;
+            this.acceptsCommands = false;
 
             var stopCode = () => { 
                 this.isExecutingCommand = false;
-                if(!this.acceptCommands && completion!=null) {
-                    this.acceptCommands = true;
+                if(!this.acceptsCommands && completion!=null) {
+                    this.acceptsCommands = true;
                     completion();
                 }
             };
@@ -896,7 +839,7 @@ function inject(domElement, toolbox, toolboxPosition, scrollbars = true, horizon
     }
     
     var workspaceData = {
-        toolbox: Blockly.Blocks.defaultToolboxSimple, //toolbox
+        toolbox: Blockly.Blocks.experimentalToolBox, //toolbox
         toolboxPosition: toolboxPosition,
         scrollbars: scrollbars,
         horizontalLayout: horizontalLayout,
@@ -924,25 +867,19 @@ function loadXMLProgram(xml) {
 }
 
 function _arbitrateEvent(source, data) {
-    var event = environment.vm.events.arbitrate(source, data);
-    if(event!=null) {
-        environment.robot.halt();
-        event.task();
-    }
+    environment.vm.events.arbitrate(source, data, environment);
 }
 
 function run() {
     // Run button behaviour
-    environment.robot.halt();
     environment.robot.run();
     _arbitrateEvent(softwareEventProgramStartedEventSource, null);
 }
 
 function stop() {
     // Stop button behaviour
-    if(environment.vm.isRunning) {
-        environment.robot.stop();
-    }
+    environment.robot.stop();
+    environment.stopCurrentBlock();
 }
 
 // This function only filter bumper events

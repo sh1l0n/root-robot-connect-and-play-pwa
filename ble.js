@@ -1,5 +1,7 @@
 // Copyright © 2019 Root Robotics, Inc. (http://www.codewithroot.com/) All rights reserved.
 
+'use strict';
+
 var blePeripheral = null;
 var tx = null;
 var rx = null;

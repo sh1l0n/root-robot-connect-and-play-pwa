@@ -5,7 +5,9 @@
     <meta http-equiv="Content-Type" content="text/html">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="manifest" href="./manifest.json">
+    <link rel="manifest" href="manifest.json">
+
+    <script src="sw.js"  type="application/javascript"></script>
 
     <!-- Web BLE  -->
     <script src="ble.js"  type="application/javascript"></script>
@@ -49,6 +51,22 @@
     </div>
 
     <h6 style="bottom: 0px; width: 100%;">Copyright © 2019 Root Robotics, Inc. (http://www.codewithroot.com/) All rights reserved.</h6>
-    
+
+
+    <script>
+        if('serviceWorker' in navigator) {
+            navigator.serviceWorker
+                .register('sw.js')
+                .then(function(result) {
+                    console.info("sw.js was registered.")
+                })
+                .catch(function(err) {
+                    console.info('Service workers are not supported.');
+            });
+        }
+        else {
+            console.info('Service workers are not supported.');
+        }
+    </script>
 </body>
 </html>
