@@ -118,11 +118,6 @@ class EventSVMSemantics extends StatementSVMRootV1Semantics {
         this.event = null;
     };
     
-    stop(environment) {
-        super.stop()
-        //self?.statement?.view?.hideRunningMark()
-    };
-    
     didDetach(environment) {
         environment.vm.events.remove(this.event)
     };
@@ -160,7 +155,7 @@ class WhenRootV1BumpersChangeSVMSemantics extends EventSVMSemantics {
     };
 
     didInsert(environment) {      
-        var value = this.statment.childBlocks_[0].inputList[0].fieldRow[0].value_;
+        var value = this.statment.getInputTargetBlock('CHOICE').getFieldValue('CHOICE');
         this.event = environment.robot.whenBumpers(this.parseFromParam(value), () => {
 
             environment.setCurrentBlock(this.statment);
@@ -172,7 +167,7 @@ class WhenRootV1BumpersChangeSVMSemantics extends EventSVMSemantics {
     };
     
     didModify(environment, calledFromEditor) {        
-        var value = this.statment.inputList[0].fieldRow[0].value_;
+        var value = this.statment.getInputTargetBlock('CHOICE').getFieldValue('CHOICE');
         this.event.condition = this.parseFromParam(value)
     };
 }
@@ -558,7 +553,10 @@ class Environment {
                         environment.blocks[block.parentBlock_.id].didModify(environment, true);
                     break;
                     default: 
-                        environment.blocks[blockId].didModify(environment); 
+                        var semanticsOfBlock = environment.blocks[blockId];
+                        if(semanticsOfBlock!=null) {
+                            semanticsOfBlock.didModify(environment, true);     
+                        }
                     break;
                 }
                 break;
