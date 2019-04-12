@@ -234,7 +234,7 @@ class ControlRepeatSVMSemantics extends StatementSVMRootV1Semantics {
 
         environment.setCurrentBlock(null);
         this.resetIterations();
-        getNextAction(environment)();
+        this.getNextAction(environment)();
     };
 
     stop(environment) {
@@ -476,16 +476,20 @@ class Environment {
         
         switch(type) {
             // Events
-            case 'event_whenflagclicked' : return Blockly.Colours.RootCodingEvents.primary;
-            case 'event_whenBumpersPressed' : return Blockly.Colours.RootCodingEvents.primary;
+            case 'event_whenflagclicked':
+            case 'event_whenBumpersPressed': 
+                return Blockly.Colours.RootCodingEvents.primary;
         
             // Commands
-            case 'move': return Blockly.Colours.RootCodingCommands.primary;
-            case 'rotate': return Blockly.Colours.RootCodingCommands.primary;
+            case 'move':
+            case 'rotate': 
+                return Blockly.Colours.RootCodingCommands.primary;
         
             // Flow Control
-            case 'control_repeat': return Blockly.Colours.RootCodingControl.primary;
-            case 'control_wait': return Blockly.Colours.RootCodingControl.primary;
+            case 'control_repeat': 
+            case 'control_wait': 
+                return Blockly.Colours.RootCodingControl.primary;
+                
             default: return block.getColour();
         }
     };
